@@ -40,7 +40,7 @@ public:
 
 BZ_PLUGIN(PlayerJoinHandler)
 
-void PlayerJoinHandler::Init (const char* commandLine)
+void PlayerJoinHandler::Init (const char* /*commandLine*/)
 {
     Register(bz_eGetAutoTeamEvent);
     Register(bz_ePlayerPartEvent);
@@ -96,7 +96,7 @@ void PlayerJoinHandler::Event (bz_EventData *eventData)
         case bz_ePlayerPartEvent: // This event is called each time a player leaves a game
         {
             bz_PlayerJoinPartEventData_V1* partData = (bz_PlayerJoinPartEventData_V1*)eventData;
-            bz_BasePlayerRecord &pr = partData->record;
+            bz_BasePlayerRecord* &pr = partData->record;
 
             if (pr->verified)
             {
