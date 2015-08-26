@@ -22,15 +22,25 @@ THE SOFTWARE.
 
 #include <map>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 #include "bzfsAPI.h"
 #include "plugin_utils.h"
 
+// Define plugin name
+const std::string PLUGIN_NAME = "Player Join Handler";
+
+// Define plugin version numbering
+const int MAJOR = 1;
+const int MINOR = 0;
+const int REV = 0;
+const int BUILD = 1;
+
 class PlayerJoinHandler : public bz_Plugin
 {
 public:
-    virtual const char* Name () {return "Player Join Handler";}
+    virtual const char* Name ();
     virtual void Init (const char* config);
     virtual void Event (bz_EventData *eventData);
     virtual void Cleanup (void);
@@ -39,6 +49,21 @@ public:
 };
 
 BZ_PLUGIN(PlayerJoinHandler)
+
+const char* PlayerJoinHandler::Name (void)
+{
+    static std::string pluginBuild = "";
+
+    if (!pluginBuild.size())
+    {
+        std::ostringstream pluginBuildStream;
+
+        pluginBuildStream << PLUGIN_NAME << " " << MAJOR << "." << MINOR << "." << REV << " (" << BUILD << ")";
+        pluginBuild = pluginBuildStream.str();
+    }
+
+    return pluginBuild.c_str();
+}
 
 void PlayerJoinHandler::Init (const char* /*commandLine*/)
 {
