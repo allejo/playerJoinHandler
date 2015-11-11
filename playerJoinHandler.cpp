@@ -35,7 +35,7 @@ const std::string PLUGIN_NAME = "Player Join Handler";
 const int MAJOR = 1;
 const int MINOR = 0;
 const int REV = 0;
-const int BUILD = 1;
+const int BUILD = 2;
 
 class PlayerJoinHandler : public bz_Plugin
 {
@@ -46,6 +46,7 @@ public:
     virtual void Cleanup (void);
 
     std::map<std::string, double> playerSessions;
+    std::string bzdbVariable;
 };
 
 BZ_PLUGIN(PlayerJoinHandler)
@@ -70,9 +71,11 @@ void PlayerJoinHandler::Init (const char* /*commandLine*/)
     Register(bz_eGetAutoTeamEvent);
     Register(bz_ePlayerPartEvent);
 
-    if (!bz_BZDBItemExists("_rejoinTime"))
+    bzdbVariable = "_sessionTime";
+
+    if (!bz_BZDBItemExists(bzdbVariable.c_str()))
     {
-        bz_setBZDBInt("_rejoinTime", 120);
+        bz_setBZDBInt(bzdbVariable.c_str(), 120);
     }
 }
 
@@ -90,7 +93,7 @@ void PlayerJoinHandler::Event (bz_EventData *eventData)
             bz_GetAutoTeamEventData_V1* autoTeamData = (bz_GetAutoTeamEventData_V1*)eventData;
 
             std::unique_ptr<bz_BasePlayerRecord> pr(bz_getPlayerByIndex(autoTeamData->playerID));
-            int rejoinTime = bz_getBZDBInt("_rejoinTime");
+            int rejoinTime = bz_getBZDBInt(bzdbVariable.c_str());
             std::string bzID = pr->bzID.c_str();
 
             if ((bz_isCountDownActive() || bz_isCountDownInProgress() || bz_isCountDownPaused()) && autoTeamData->team != eObservers)
