@@ -1,29 +1,28 @@
 /*
-Copyright (C) 2015 Vladimir "allejo" Jimenez
+    Copyright (C) 2016 Vladimir "allejo" Jimenez
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
 */
 
 #include <map>
 #include <memory>
 #include <sstream>
-#include <vector>
 
 #include "bzfsAPI.h"
 #include "plugin_utils.h"
@@ -34,8 +33,8 @@ const std::string PLUGIN_NAME = "Player Join Handler";
 // Define plugin version numbering
 const int MAJOR = 1;
 const int MINOR = 0;
-const int REV = 0;
-const int BUILD = 2;
+const int REV = 1;
+const int BUILD = 12;
 
 class PlayerJoinHandler : public bz_Plugin
 {
@@ -45,8 +44,11 @@ public:
     virtual void Event (bz_EventData *eventData);
     virtual void Cleanup (void);
 
-    std::map<std::string, double> playerSessions;
-    std::string bzdbVariable;
+    typedef std::map<std::string, double> SessionList;
+    virtual bool checkSession(SessionList &list, std::string target);
+
+    SessionList bzidSessions, ipSessions;
+    std::string bzdb_SessionTime, bzdb_AllowUnregistered;
 };
 
 BZ_PLUGIN(PlayerJoinHandler)
@@ -71,11 +73,17 @@ void PlayerJoinHandler::Init (const char* /*commandLine*/)
     Register(bz_eGetAutoTeamEvent);
     Register(bz_ePlayerPartEvent);
 
-    bzdbVariable = "_sessionTime";
+    bzdb_SessionTime       = "_sessionTime";
+    bzdb_AllowUnregistered = "_allowVerified";
 
-    if (!bz_BZDBItemExists(bzdbVariable.c_str()))
+    if (!bz_BZDBItemExists(bzdb_SessionTime.c_str()))
     {
-        bz_setBZDBInt(bzdbVariable.c_str(), 120);
+        bz_setBZDBInt(bzdb_SessionTime.c_str(), 120);
+    }
+    
+    if (!bz_BZDBItemExists(bzdb_AllowUnregistered.c_str()))
+    {
+        bz_setBZDBBool(bzdb_AllowUnregistered.c_str(), false);
     }
 }
 
@@ -88,53 +96,58 @@ void PlayerJoinHandler::Event (bz_EventData *eventData)
 {
     switch (eventData->eventType)
     {
-        case bz_eGetAutoTeamEvent: // This event is called for each new player is added to a team
+        case bz_eGetAutoTeamEvent:
         {
             bz_GetAutoTeamEventData_V1* autoTeamData = (bz_GetAutoTeamEventData_V1*)eventData;
 
             std::unique_ptr<bz_BasePlayerRecord> pr(bz_getPlayerByIndex(autoTeamData->playerID));
-            int rejoinTime = bz_getBZDBInt(bzdbVariable.c_str());
-            std::string bzID = pr->bzID.c_str();
+
+            std::string bzID       = pr->bzID.c_str();
+            std::string ipAddress  = pr->ipAddress.c_str();
+            bool allowUnregistered = bz_getBZDBBool(bzdb_AllowUnregistered.c_str());
 
             if ((bz_isCountDownActive() || bz_isCountDownInProgress() || bz_isCountDownPaused()) && autoTeamData->team != eObservers)
             {
-                if (!pr->verified)
-                {
-                    autoTeamData->handled = true;
-                    autoTeamData->team = eObservers;
+                autoTeamData->handled = true;
+                autoTeamData->team = eObservers;
 
-                    bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "Your callsign is not verified, you will not be able to join any non-observer team during a match.");
-                    bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "Please register your callsign or ensure you are authenticating properly.");
-                }
-                else
+                if ((pr->verified  && checkSession(bzidSessions, bzID)) ||
+                    (!pr->verified && checkSession(ipSessions, ipAddress)) ||
+                    (!pr->verified && !allowUnregistered))
                 {
-                    if ((playerSessions.find(bzID) == playerSessions.end()) || (playerSessions[bzID] + rejoinTime < bz_getCurrentTime()))
-                    {
-                        autoTeamData->handled = true;
-                        autoTeamData->team = eObservers;
-
-                        bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "An active match is currently in progress. You have been automatically moved to the observer team to avoid disruption.");
-                        bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "If you intend to substitute another player, you may now rejoin as a player.");
-                    }
+                    bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "An active match is currently in progress. You have been automatically moved to the observer team to avoid disruption.");
+                    bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "If you intend to substitute another player, you may now rejoin as a player.");
                 }
             }
         }
         break;
 
-        case bz_ePlayerPartEvent: // This event is called each time a player leaves a game
+        case bz_ePlayerPartEvent:
         {
             bz_PlayerJoinPartEventData_V1* partData = (bz_PlayerJoinPartEventData_V1*)eventData;
             bz_BasePlayerRecord* &pr = partData->record;
 
+            std::string ipAddress = pr->ipAddress.c_str();
+            std::string bzID = pr->bzID.c_str();
+
             if (pr->verified)
             {
-                std::string bzID = pr->bzID.c_str();
-
-                playerSessions[bzID] = bz_getCurrentTime();
+                bzidSessions[bzID] = bz_getCurrentTime();
+            }
+            else
+            {
+                ipSessions[ipAddress] = bz_getCurrentTime();
             }
         }
         break;
 
         default: break;
     }
+}
+
+bool PlayerJoinHandler::checkSession(SessionList &list, std::string target)
+{
+    int rejoinTime = bz_getBZDBInt(bzdb_SessionTime.c_str());
+
+    return (list.find(target) == list.end()) || (list[target] + rejoinTime < bz_getCurrentTime());
 }
