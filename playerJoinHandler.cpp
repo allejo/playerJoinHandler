@@ -74,13 +74,13 @@ void PlayerJoinHandler::Init (const char* /*commandLine*/)
     Register(bz_ePlayerPartEvent);
 
     bzdb_SessionTime       = "_sessionTime";
-    bzdb_AllowUnregistered = "_allowVerified";
+    bzdb_AllowUnregistered = "_allowUnverified";
 
     if (!bz_BZDBItemExists(bzdb_SessionTime.c_str()))
     {
         bz_setBZDBInt(bzdb_SessionTime.c_str(), 120);
     }
-    
+
     if (!bz_BZDBItemExists(bzdb_AllowUnregistered.c_str()))
     {
         bz_setBZDBBool(bzdb_AllowUnregistered.c_str(), false);
