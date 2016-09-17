@@ -33,8 +33,8 @@ const std::string PLUGIN_NAME = "Player Join Handler";
 // Define plugin version numbering
 const int MAJOR = 1;
 const int MINOR = 0;
-const int REV = 1;
-const int BUILD = 12;
+const int REV = 2;
+const int BUILD = 16;
 
 class PlayerJoinHandler : public bz_Plugin
 {
@@ -45,7 +45,7 @@ public:
     virtual void Cleanup (void);
 
     typedef std::map<std::string, double> SessionList;
-    virtual bool checkSession(SessionList &list, std::string target);
+    virtual bool sessionExists(SessionList &list, std::string target);
 
     SessionList bzidSessions, ipSessions;
     std::string bzdb_SessionTime, bzdb_AllowUnregistered;
@@ -108,15 +108,26 @@ void PlayerJoinHandler::Event (bz_EventData *eventData)
 
             if ((bz_isCountDownActive() || bz_isCountDownInProgress() || bz_isCountDownPaused()) && autoTeamData->team != eObservers)
             {
-                autoTeamData->handled = true;
-                autoTeamData->team = eObservers;
-
-                if ((pr->verified  && checkSession(bzidSessions, bzID)) ||
-                    (!pr->verified && checkSession(ipSessions, ipAddress)) ||
+                if ((pr->verified  && !sessionExists(bzidSessions, bzID))    ||
+                    (!pr->verified && !sessionExists(ipSessions, ipAddress)) ||
                     (!pr->verified && !allowUnregistered))
                 {
+                    autoTeamData->handled = true;
+                    autoTeamData->team = eObservers;
+
                     bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "An active match is currently in progress. You have been automatically moved to the observer team to avoid disruption.");
-                    bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "If you intend to substitute another player, you may now rejoin as a player.");
+
+                    if (pr->verified)
+                    {
+                        bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "If you intend to substitute another player, you may now rejoin as a player.");
+                    }
+                    else
+                    {
+                        if (!allowUnregistered)
+                        {
+                            bz_sendTextMessage(BZ_SERVER, autoTeamData->playerID, "This server only allows registered players to join as a subtitute, please use a registered account.");
+                        }
+                    }
                 }
             }
         }
@@ -145,9 +156,9 @@ void PlayerJoinHandler::Event (bz_EventData *eventData)
     }
 }
 
-bool PlayerJoinHandler::checkSession(SessionList &list, std::string target)
+bool PlayerJoinHandler::sessionExists(SessionList &list, std::string target)
 {
     int rejoinTime = bz_getBZDBInt(bzdb_SessionTime.c_str());
 
-    return (list.find(target) == list.end()) || (list[target] + rejoinTime < bz_getCurrentTime());
+    return (list.count(target)) && (list[target] + rejoinTime > bz_getCurrentTime());
 }
