@@ -2,6 +2,7 @@
 
 [![GitHub release](https://img.shields.io/github/release/allejo/playerJoinHandler.svg?maxAge=2592000)](https://github.com/allejo/playerJoinHandler/releases/latest)
 ![Minimum BZFlag Version](https://img.shields.io/badge/BZFlag-v2.4.0+-blue.svg)
+[![License](https://img.shields.io/github/license/allejo/playerJoinHandler.svg)](https://github.com/allejo/playerJoinHandler/blob/master/LICENSE.md)
 
 A BZFlag plug-in that keeps track of player sessions and automatically moves players to the observer team if a match is in progress and they were not already on the server.
 
