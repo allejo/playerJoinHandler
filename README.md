@@ -6,7 +6,7 @@
 
 A BZFlag plug-in that keeps track of player sessions and automatically moves players to the observer team if a match is in progress and they were not already on the server.
 
-A session exists the entire time a player is on the server plus 120 seconds (this can be configured through `_sessionTime`) after they have disconnected. If a match is in progress, players will only be able join while their session is still active. By default, unverified players cannot join a match even if they have an session; this can be disabled by settings `_allowUnverified` to true.
+A session exists the entire time a player is on the server plus 120 seconds (this can be configured through `_sessionTime`) after they have disconnected. If a match is in progress, players will only be able to join while their session is still active. By default, unverified players cannot join a match even if they have a session; this can be disabled by settings `_allowUnverified` to true.
 
 ## Usage
 
